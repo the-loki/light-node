@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>节点系统 Showcase</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+      }
+
+      #canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #debug-panel {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 320px;
+        max-height: 80vh;
+        overflow-y: auto;
+        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        padding: 16px;
+        font-size: 13px;
+        backdrop-filter: blur(10px);
+        z-index: 1000;
+      }
+
+      #debug-panel h3 {
+        margin: 0 0 12px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        border-bottom: 2px solid #2196f3;
+        padding-bottom: 8px;
+      }
+
+      .debug-section {
+        margin-bottom: 16px;
+      }
+
+      .debug-section h4 {
+        margin: 0 0 8px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #555;
+      }
+
+      .debug-info {
+        background: #f5f5f5;
+        padding: 8px;
+        border-radius: 4px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        line-height: 1.6;
+        color: #333;
+      }
+
+      .debug-info pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+
+      .help-text {
+        background: #e3f2fd;
+        padding: 10px;
+        border-radius: 4px;
+        margin-bottom: 12px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: #1976d2;
+      }
+
+      .help-text ul {
+        margin: 8px 0 0 0;
+        padding-left: 20px;
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: none;
+        border: none;
+        font-size: 18px;
+        cursor: pointer;
+        color: #999;
+        padding: 4px 8px;
+        line-height: 1;
+      }
+
+      .close-btn:hover {
+        color: #333;
+      }
+
+      #toggle-debug {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        padding: 10px 20px;
+        background: #2196f3;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+        z-index: 999;
+      }
+
+      #toggle-debug:hover {
+        background: #1976d2;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+
+    <div id="debug-panel">
+      <button class="close-btn" onclick="toggleDebugPanel()">×</button>
+      <h3>调试信息</h3>
+
+      <div class="help-text">
+        <strong>操作说明：</strong>
+        <ul>
+          <li>鼠标左键拖拽：移动节点</li>
+          <li>鼠标滚轮：缩放画布</li>
+          <li>鼠标中键拖拽：平移画布</li>
+        </ul>
+      </div>
+
+      <div class="debug-section">
+        <h4>视口状态</h4>
+        <div class="debug-info" id="viewport-info">
+          <pre>加载中...</pre>
+        </div>
+      </div>
+
+      <div class="debug-section">
+        <h4>节点数量</h4>
+        <div class="debug-info" id="node-count">
+          <pre>加载中...</pre>
+        </div>
+      </div>
+
+      <div class="debug-section">
+        <h4>连接数量</h4>
+        <div class="debug-info" id="connection-count">
+          <pre>加载中...</pre>
+        </div>
+      </div>
+
+      <div class="debug-section">
+        <h4>选中节点</h4>
+        <div class="debug-info" id="selected-node">
+          <pre>无</pre>
+        </div>
+      </div>
+    </div>
+
+    <button id="toggle-debug" onclick="toggleDebugPanel()">隐藏调试面板</button>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
