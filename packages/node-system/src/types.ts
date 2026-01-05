@@ -86,3 +86,85 @@ export interface RenderConfig {
   selectionColor: string;
   font: string;
 }
+
+/**
+ * 渲染上下文
+ * 提供渲染所需的所有上下文信息
+ */
+export interface RenderContext {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  nodeSystem: unknown;
+  viewport: Viewport;
+  worldToScreen: (position: Position) => Position;
+  screenToWorld: (position: Position) => Position;
+}
+
+/**
+ * 节点渲染器接口
+ * 用于自定义节点的渲染方式
+ */
+export interface NodeRenderer {
+  /**
+   * 渲染节点
+   * @param node 要渲染的节点
+   * @param context 渲染上下文
+   */
+  render(node: Node, context: RenderContext): void;
+}
+
+/**
+ * 连线路由点
+ */
+export interface EdgeRoutePoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * 连线路由器接口
+ * 用于计算连线的路径
+ */
+export interface EdgeRouter {
+  /**
+   * 计算连线路径
+   * @param connection 连接信息
+   * @param fromNode 源节点
+   * @param toNode 目标节点
+   * @param context 渲染上下文
+   * @returns 路径点数组
+   */
+  calculateRoute(
+    connection: Connection,
+    fromNode: Node,
+    toNode: Node,
+    context: RenderContext
+  ): EdgeRoutePoint[];
+}
+
+/**
+ * 连线渲染器接口
+ * 用于自定义连线的渲染方式
+ */
+export interface EdgeRenderer {
+  /**
+   * 渲染连线
+   * @param connection 连接信息
+   * @param route 连线路径
+   * @param context 渲染上下文
+   */
+  render(connection: Connection, route: EdgeRoutePoint[], context: RenderContext): void;
+}
+
+/**
+ * 节点数据接口(用于渲染器)
+ */
+export interface Node {
+  id: string;
+  position: Position;
+  size: Size;
+  label: string;
+  inputs: Port[];
+  outputs: Port[];
+  data: Record<string, unknown>;
+}

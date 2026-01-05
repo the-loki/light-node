@@ -1,4 +1,5 @@
-import { NodeSystem, Renderer, type Node, type Position, type NodeConfig } from "@vibe-kanban/node-system";
+import { NodeSystem, Renderer, DefaultNodeRenderer, DefaultEdgeRouter, DefaultEdgeRenderer, type Node, type Position, type NodeConfig } from "@vibe-kanban/node-system";
+import { RoundedNodeRenderer, OrthogonalEdgeRouter, GradientEdgeRenderer } from "./customRenderers.js";
 
 // 获取 Canvas 元素
 const canvas = document.getElementById("canvas") as HTMLCanvasElement;
@@ -9,8 +10,12 @@ if (!canvas) {
 // 创建节点系统
 const nodeSystem = new NodeSystem();
 
-// 创建渲染器
+// 创建渲染器(使用默认渲染器)
 const renderer = new Renderer(canvas, nodeSystem);
+
+// 渲染器模式
+type RendererMode = "default" | "custom";
+let currentRendererMode: RendererMode = "default";
 
 // 调整画布大小
 function resizeCanvas(): void {
@@ -261,6 +266,43 @@ function updateDebugInfo(): void {
         button.textContent = "显示调试面板";
       }
     }
+  };
+
+// 切换渲染器
+(window as unknown as { toggleRenderer: () => void }).toggleRenderer =
+  function toggleRenderer(): void {
+    const button = document.getElementById("toggle-renderer");
+    const rendererInfo = document.getElementById("renderer-info");
+
+    if (currentRendererMode === "default") {
+      // 切换到自定义渲染器
+      renderer.setNodeRenderer(new RoundedNodeRenderer());
+      renderer.setEdgeRouter(new OrthogonalEdgeRouter());
+      renderer.setEdgeRenderer(new GradientEdgeRenderer());
+      currentRendererMode = "custom";
+
+      if (button) {
+        button.textContent = "切换到默认渲染器";
+      }
+      if (rendererInfo) {
+        rendererInfo.innerHTML = "<pre>自定义 (圆角节点 + 直角连线)</pre>";
+      }
+    } else {
+      // 切换到默认渲染器
+      renderer.setNodeRenderer(new DefaultNodeRenderer());
+      renderer.setEdgeRouter(new DefaultEdgeRouter());
+      renderer.setEdgeRenderer(new DefaultEdgeRenderer());
+      currentRendererMode = "default";
+
+      if (button) {
+        button.textContent = "切换到自定义渲染器";
+      }
+      if (rendererInfo) {
+        rendererInfo.innerHTML = "<pre>默认 (矩形节点 + 贝塞尔曲线)</pre>";
+      }
+    }
+
+    renderer.render();
   };
 
 // 初始渲染

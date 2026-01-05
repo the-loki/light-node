@@ -1,6 +1,9 @@
-import type { RenderConfig, Position } from "./types.js";
+import type { RenderConfig, Position, RenderContext, NodeRenderer, EdgeRouter, EdgeRenderer, EdgeRoutePoint } from "./types.js";
 import type { NodeSystem } from "./NodeSystem.js";
 import type { Node } from "./Node.js";
+import { DefaultNodeRenderer } from "./renderers/DefaultNodeRenderer.js";
+import { DefaultEdgeRouter } from "./renderers/DefaultEdgeRouter.js";
+import { DefaultEdgeRenderer } from "./renderers/DefaultEdgeRenderer.js";
 
 /**
  * 默认渲染配置
@@ -19,14 +22,25 @@ const DEFAULT_RENDER_CONFIG: RenderConfig = {
 
 /**
  * 渲染器类
+ * 支持自定义节点渲染器、连线路由器和连线渲染器
  */
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private config: RenderConfig;
   private nodeSystem: NodeSystem;
+  private nodeRenderer: NodeRenderer;
+  private edgeRouter: EdgeRouter;
+  private edgeRenderer: EdgeRenderer;
 
-  constructor(canvas: HTMLCanvasElement, nodeSystem: NodeSystem, config?: Partial<RenderConfig>) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    nodeSystem: NodeSystem,
+    config?: Partial<RenderConfig>,
+    nodeRenderer?: NodeRenderer,
+    edgeRouter?: EdgeRouter,
+    edgeRenderer?: EdgeRenderer
+  ) {
     this.canvas = canvas;
     const context = canvas.getContext("2d");
     if (!context) {
@@ -35,6 +49,11 @@ export class Renderer {
     this.ctx = context;
     this.nodeSystem = nodeSystem;
     this.config = { ...DEFAULT_RENDER_CONFIG, ...config };
+
+    // 使用传入的渲染器或默认渲染器
+    this.nodeRenderer = nodeRenderer || new DefaultNodeRenderer();
+    this.edgeRouter = edgeRouter || new DefaultEdgeRouter();
+    this.edgeRenderer = edgeRenderer || new DefaultEdgeRenderer();
   }
 
   /**
@@ -85,120 +104,17 @@ export class Renderer {
   }
 
   /**
-   * 绘制节点
+   * 创建渲染上下文
    */
-  private drawNode(node: Node): void {
-    const screenPos = this.nodeSystem.worldToScreen(node.position);
-    const width = node.size.width * this.nodeSystem.viewport.scale;
-    const height = node.size.height * this.nodeSystem.viewport.scale;
-
-    // 节点背景
-    this.ctx.fillStyle = this.config.nodeBackgroundColor;
-    this.ctx.strokeStyle = this.config.nodeBorderColor;
-    this.ctx.lineWidth = 2;
-
-    this.ctx.fillRect(screenPos.x, screenPos.y, width, height);
-    this.ctx.strokeRect(screenPos.x, screenPos.y, width, height);
-
-    // 节点标题
-    const headerHeight = 30 * this.nodeSystem.viewport.scale;
-    this.ctx.fillStyle = this.config.nodeHeaderColor;
-    this.ctx.fillRect(screenPos.x, screenPos.y, width, headerHeight);
-
-    // 节点标签
-    this.ctx.fillStyle = "#000000";
-    this.ctx.font = this.config.font;
-    this.ctx.textAlign = "left";
-    this.ctx.textBaseline = "middle";
-    this.ctx.fillText(
-      node.label,
-      screenPos.x + 10,
-      screenPos.y + headerHeight / 2
-    );
-
-    // 绘制端口
-    this.drawPorts(node);
-  }
-
-  /**
-   * 绘制端口
-   */
-  private drawPorts(node: Node): void {
-    const portRadius = 6 * this.nodeSystem.viewport.scale;
-
-    // 输入端口
-    for (const port of node.inputs) {
-      const portPos = node.getInputPortPosition(port.id);
-      const screenPos = this.nodeSystem.worldToScreen(portPos);
-
-      this.ctx.fillStyle = "#4caf50";
-      this.ctx.beginPath();
-      this.ctx.arc(screenPos.x, screenPos.y, portRadius, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // 端口标签
-      this.ctx.fillStyle = "#000000";
-      this.ctx.font = `${10 * this.nodeSystem.viewport.scale}px sans-serif`;
-      this.ctx.textAlign = "left";
-      this.ctx.textBaseline = "middle";
-      this.ctx.fillText(port.label, screenPos.x + portRadius + 5, screenPos.y);
-    }
-
-    // 输出端口
-    for (const port of node.outputs) {
-      const portPos = node.getOutputPortPosition(port.id);
-      const screenPos = this.nodeSystem.worldToScreen(portPos);
-
-      this.ctx.fillStyle = "#ff9800";
-      this.ctx.beginPath();
-      this.ctx.arc(screenPos.x, screenPos.y, portRadius, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // 端口标签
-      this.ctx.fillStyle = "#000000";
-      this.ctx.font = `${10 * this.nodeSystem.viewport.scale}px sans-serif`;
-      this.ctx.textAlign = "right";
-      this.ctx.textBaseline = "middle";
-      this.ctx.fillText(port.label, screenPos.x - portRadius - 5, screenPos.y);
-    }
-  }
-
-  /**
-   * 绘制连接
-   */
-  private drawConnection(fromNode: Node, toNode: Node): void {
-    const connections = this.nodeSystem.connectionManager.getAllConnections();
-
-    for (const conn of connections) {
-      if (conn.from.nodeId !== fromNode.id || conn.to.nodeId !== toNode.id) {
-        continue;
-      }
-
-      const fromPortPos = fromNode.getOutputPortPosition(conn.from.portId);
-      const toPortPos = toNode.getInputPortPosition(conn.to.portId);
-
-      const fromScreen = this.nodeSystem.worldToScreen(fromPortPos);
-      const toScreen = this.nodeSystem.worldToScreen(toPortPos);
-
-      // 绘制贝塞尔曲线
-      this.ctx.strokeStyle = this.config.connectionColor;
-      this.ctx.lineWidth = 2 * this.nodeSystem.viewport.scale;
-      this.ctx.beginPath();
-
-      this.ctx.moveTo(fromScreen.x, fromScreen.y);
-
-      const controlOffset = Math.abs(toScreen.x - fromScreen.x) * 0.5;
-      this.ctx.bezierCurveTo(
-        fromScreen.x + controlOffset,
-        fromScreen.y,
-        toScreen.x - controlOffset,
-        toScreen.y,
-        toScreen.x,
-        toScreen.y
-      );
-
-      this.ctx.stroke();
-    }
+  private createRenderContext(): RenderContext {
+    return {
+      canvas: this.canvas,
+      ctx: this.ctx,
+      nodeSystem: this.nodeSystem,
+      viewport: this.nodeSystem.viewport,
+      worldToScreen: (pos) => this.nodeSystem.worldToScreen(pos),
+      screenToWorld: (pos) => this.nodeSystem.screenToWorld(pos),
+    };
   }
 
   /**
@@ -208,6 +124,7 @@ export class Renderer {
     this.clear();
     this.drawGrid();
 
+    const renderContext = this.createRenderContext();
     const nodes = this.nodeSystem.getAllNodes();
 
     // 先绘制连接线
@@ -217,14 +134,36 @@ export class Renderer {
       const toNode = this.nodeSystem.getNode(conn.to.nodeId);
 
       if (fromNode && toNode) {
-        this.drawConnection(fromNode, toNode);
+        const route = this.edgeRouter.calculateRoute(conn, fromNode, toNode, renderContext);
+        this.edgeRenderer.render(conn, route, renderContext);
       }
     }
 
     // 再绘制节点
     for (const node of nodes) {
-      this.drawNode(node);
+      this.nodeRenderer.render(node, renderContext);
     }
+  }
+
+  /**
+   * 设置节点渲染器
+   */
+  setNodeRenderer(nodeRenderer: NodeRenderer): void {
+    this.nodeRenderer = nodeRenderer;
+  }
+
+  /**
+   * 设置连线路由器
+   */
+  setEdgeRouter(edgeRouter: EdgeRouter): void {
+    this.edgeRouter = edgeRouter;
+  }
+
+  /**
+   * 设置连线渲染器
+   */
+  setEdgeRenderer(edgeRenderer: EdgeRenderer): void {
+    this.edgeRenderer = edgeRenderer;
   }
 
   /**

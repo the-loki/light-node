@@ -129,6 +129,26 @@
       #toggle-debug:hover {
         background: #1976d2;
       }
+
+      #toggle-renderer {
+        position: fixed;
+        bottom: 20px;
+        left: 20px;
+        padding: 10px 20px;
+        background: #ff9800;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+        z-index: 999;
+      }
+
+      #toggle-renderer:hover {
+        background: #f57c00;
+      }
     </style>
   </head>
   <body>
@@ -174,9 +194,17 @@
           <pre>无</pre>
         </div>
       </div>
+
+      <div class="debug-section">
+        <h4>当前渲染器</h4>
+        <div class="debug-info" id="renderer-info">
+          <pre>默认 (矩形节点 + 贝塞尔曲线)</pre>
+        </div>
+      </div>
     </div>
 
     <button id="toggle-debug" onclick="toggleDebugPanel()">隐藏调试面板</button>
+    <button id="toggle-renderer" onclick="toggleRenderer()">切换到自定义渲染器</button>
 
     <script type="module" src="/src/main.ts"></script>
   </body>
