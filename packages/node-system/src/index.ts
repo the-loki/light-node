@@ -15,6 +15,10 @@ export type {
   EdgeRenderer,
   EdgeRoutePoint,
   Node as NodeInterface,
+  PortRef,
+  EventTypes,
+  NodeSystemEvent,
+  EventListener,
 } from "./types.js";
 
 export { Node } from "./Node.js";

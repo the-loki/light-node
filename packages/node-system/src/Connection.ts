@@ -34,8 +34,19 @@ export class ConnectionManager {
   /**
    * 获取连接
    */
-  getConnection(connectionId: string): Connection | undefined {
-    return this.connections.get(connectionId);
+  getConnection(connectionId: string): Connection {
+    const connection = this.connections.get(connectionId);
+    if (connection === undefined) {
+      throw new Error(`Connection ${connectionId} not found`);
+    }
+    return connection;
+  }
+
+  /**
+   * 检查连接是否存在
+   */
+  hasConnection(connectionId: string): boolean {
+    return this.connections.has(connectionId);
   }
 
   /**

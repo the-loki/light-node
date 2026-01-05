@@ -1,4 +1,4 @@
-import { NodeSystem, Renderer, DefaultNodeRenderer, DefaultEdgeRouter, DefaultEdgeRenderer, type Node, type Position, type NodeConfig } from "@vibe-kanban/node-system";
+import { NodeSystem, Renderer, DefaultNodeRenderer, DefaultEdgeRouter, DefaultEdgeRenderer, type Node, type Position, type NodeConfig, type PortRef } from "@vibe-kanban/node-system";
 import { RoundedNodeRenderer, OrthogonalEdgeRouter, GradientEdgeRenderer } from "./customRenderers.js";
 
 // 获取 Canvas 元素
@@ -115,11 +115,72 @@ nodeSystem.addConnection({
 // 交互状态
 let isDragging = false;
 let dragStart: Position = { x: 0, y: 0 };
-let selectedNode: Node | undefined = undefined;
+let selectedNode: Node;
+let hasSelectedNode = false;
 let nodeStartPos: Position = { x: 0, y: 0 };
 let isPanning = false;
 let panStart: Position = { x: 0, y: 0 };
 let viewportStart: Position = { x: 0, y: 0 };
+
+// 连线拖拽状态
+let isDraggingConnection = false;
+let connectionDragStartPort: PortRef;
+
+/**
+ * 验证连接结果
+ */
+interface ValidationResult {
+  valid: boolean;
+  reason?: string;
+}
+
+/**
+ * 验证连接是否有效（应用层验证逻辑）
+ */
+function validateConnection(fromPort: PortRef, toPort: PortRef): ValidationResult {
+  // 不能连接到同一节点
+  if (fromPort.nodeId === toPort.nodeId) {
+    return { valid: false, reason: "不能连接到同一节点" };
+  }
+
+  // 必须是从输出端口到输入端口
+  if (fromPort.portType !== "output") {
+    return { valid: false, reason: "必须从输出端口开始拖拽" };
+  }
+
+  if (toPort.portType !== "input") {
+    return { valid: false, reason: "只能连接到输入端口" };
+  }
+
+  // 检查连接是否已存在
+  if (nodeSystem.connectionExists(fromPort, toPort)) {
+    return { valid: false, reason: "连接已存在" };
+  }
+
+  return { valid: true };
+}
+
+// 设置事件监听器（用于演示事件系统）
+nodeSystem.on("connectionDragStart", (event) => {
+  console.log("连线拖拽开始:", event);
+});
+
+nodeSystem.on("connectionDragMove", (event) => {
+  // console.log("连线拖拽移动:", event);
+});
+
+nodeSystem.on("connectionDragEnd", (event) => {
+  console.log("连线拖拽结束:", event);
+});
+
+nodeSystem.on("connectionCreated", (event) => {
+  console.log("连线创建成功:", event);
+  updateDebugInfo();
+});
+
+nodeSystem.on("connectionCreateFailed", (event) => {
+  console.warn("连线创建失败:", event);
+});
 
 // 鼠标事件处理
 canvas.addEventListener("mousedown", (e) => {
@@ -139,14 +200,36 @@ canvas.addEventListener("mousedown", (e) => {
     return;
   }
 
-  // 左键：选择节点
+  // 左键：选择节点或开始拖拽连线
   if (e.button === 0) {
-    const node = nodeSystem.findNodeAtPosition(worldPos);
-    if (node) {
-      selectedNode = node;
+    // 首先检查是否点击了端口
+    const hasPort = nodeSystem.hasPortAtPosition(worldPos);
+
+    if (hasPort) {
+      const clickedPort = nodeSystem.findPortAtPosition(worldPos);
+      // 只能从输出端口开始拖拽连线
+      if (clickedPort.portType === "output") {
+        isDraggingConnection = true;
+        connectionDragStartPort = clickedPort;
+        renderer.setDraggingConnection(clickedPort, worldPos, true);
+
+        // 触发拖拽开始事件
+        nodeSystem.emit("connectionDragStart", {
+          fromPort: clickedPort,
+          startPosition: worldPos,
+        });
+      }
+      return;
+    }
+
+    // 如果没有点击端口，检查是否点击了节点
+    const hasNode = nodeSystem.hasNodeAtPosition(worldPos);
+    if (hasNode) {
+      selectedNode = nodeSystem.findNodeAtPosition(worldPos);
+      hasSelectedNode = true;
       isDragging = true;
       dragStart = worldPos;
-      nodeStartPos = { ...node.position };
+      nodeStartPos = { ...selectedNode.position };
       canvas.style.cursor = "grabbing";
     }
   }
@@ -172,7 +255,21 @@ canvas.addEventListener("mousemove", (e) => {
     return;
   }
 
-  if (isDragging && selectedNode) {
+  // 拖拽连线
+  if (isDraggingConnection && connectionDragStartPort) {
+    renderer.updateDraggingConnectionPosition(worldPos);
+    renderer.render();
+
+    // 触发拖拽移动事件
+    nodeSystem.emit("connectionDragMove", {
+      fromPort: connectionDragStartPort,
+      currentPosition: worldPos,
+    });
+    return;
+  }
+
+  // 拖拽节点
+  if (isDragging && hasSelectedNode) {
     const dx = worldPos.x - dragStart.x;
     const dy = worldPos.y - dragStart.y;
     selectedNode.setPosition({
@@ -184,14 +281,91 @@ canvas.addEventListener("mousemove", (e) => {
   }
 });
 
-canvas.addEventListener("mouseup", () => {
+canvas.addEventListener("mouseup", (e) => {
+  const rect = canvas.getBoundingClientRect();
+  const screenPos: Position = {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  };
+  const worldPos = nodeSystem.screenToWorld(screenPos);
+
+  // 结束拖拽连线
+  if (isDraggingConnection) {
+    const hasTargetPort = nodeSystem.hasPortAtPosition(worldPos);
+    let success = false;
+
+    if (hasTargetPort) {
+      const targetPort = nodeSystem.findPortAtPosition(worldPos);
+
+      if (targetPort.portType === "input") {
+        // 应用层验证连接有效性
+        const validation = validateConnection(connectionDragStartPort, targetPort);
+
+        if (validation.valid) {
+          // 创建连接
+          const result = nodeSystem.createConnection(connectionDragStartPort, targetPort);
+          success = result.success;
+        } else {
+          // 验证失败，触发失败事件
+          const failReason = validation.reason !== undefined ? validation.reason : "验证失败";
+          nodeSystem.emit("connectionCreateFailed", {
+            fromPort: connectionDragStartPort,
+            toPort: targetPort,
+            reason: failReason,
+          });
+        }
+
+        // 触发拖拽结束事件
+        nodeSystem.emit("connectionDragEnd", {
+          fromPort: connectionDragStartPort,
+          toPort: targetPort,
+          endPosition: worldPos,
+          success,
+        });
+      } else {
+        // 连接到了输出端口，失败
+        const dummyPort: PortRef = { nodeId: "", portId: "", portType: "input" };
+        nodeSystem.emit("connectionDragEnd", {
+          fromPort: connectionDragStartPort,
+          toPort: dummyPort,
+          endPosition: worldPos,
+          success: false,
+        });
+      }
+    } else {
+      // 没有连接到任何端口
+      const dummyPort: PortRef = { nodeId: "", portId: "", portType: "input" };
+      nodeSystem.emit("connectionDragEnd", {
+        fromPort: connectionDragStartPort,
+        toPort: dummyPort,
+        endPosition: worldPos,
+        success: false,
+      });
+    }
+
+    // 清理拖拽状态
+    isDraggingConnection = false;
+    renderer.setDraggingConnection(connectionDragStartPort, worldPos, false);
+    renderer.render();
+  }
+
+  // 结束节点拖拽
   isDragging = false;
+  hasSelectedNode = false;
   isPanning = false;
   canvas.style.cursor = "default";
 });
 
 canvas.addEventListener("mouseleave", () => {
+  // 清理拖拽连线状态
+  if (isDraggingConnection) {
+    isDraggingConnection = false;
+    renderer.setDraggingConnection(connectionDragStartPort, { x: 0, y: 0 }, false);
+    renderer.render();
+  }
+
   isDragging = false;
+  hasSelectedNode = false;
   isPanning = false;
   canvas.style.cursor = "default";
 });
@@ -242,7 +416,7 @@ function updateDebugInfo(): void {
   }
 
   if (selectedNodeInfo) {
-    if (selectedNode) {
+    if (hasSelectedNode) {
       selectedNodeInfo.innerHTML = `<pre>ID: ${selectedNode.id}
 位置: (${selectedNode.position.x.toFixed(0)}, ${selectedNode.position.y.toFixed(0)})
 标签: ${selectedNode.label}</pre>`;

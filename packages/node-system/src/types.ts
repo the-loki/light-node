@@ -168,3 +168,89 @@ export interface Node {
   outputs: Port[];
   data: Record<string, unknown>;
 }
+
+/**
+ * 端口引用
+ */
+export interface PortRef {
+  nodeId: string;
+  portId: string;
+  portType: PortType;
+}
+
+/**
+ * 连线拖拽状态
+ */
+export interface ConnectionDragState {
+  isDragging: boolean;
+  fromPort: PortRef;
+  currentPosition: Position;
+}
+
+/**
+ * 连线拖拽开始事件
+ */
+export interface ConnectionDragStartEvent {
+  fromPort: PortRef;
+  startPosition: Position;
+}
+
+/**
+ * 连线拖拽移动事件
+ */
+export interface ConnectionDragMoveEvent {
+  fromPort: PortRef;
+  currentPosition: Position;
+}
+
+/**
+ * 连线拖拽结束事件
+ */
+export interface ConnectionDragEndEvent {
+  fromPort: PortRef;
+  toPort: PortRef;
+  endPosition: Position;
+  success: boolean;
+}
+
+/**
+ * 连线创建成功事件
+ */
+export interface ConnectionCreatedEvent {
+  connection: Connection;
+}
+
+/**
+ * 连线创建失败事件
+ */
+export interface ConnectionCreateFailedEvent {
+  fromPort: PortRef;
+  toPort: PortRef;
+  reason: string;
+}
+
+/**
+ * 节点系统事件类型
+ */
+export type NodeSystemEvent =
+  | ConnectionDragStartEvent
+  | ConnectionDragMoveEvent
+  | ConnectionDragEndEvent
+  | ConnectionCreatedEvent
+  | ConnectionCreateFailedEvent;
+
+/**
+ * 事件监听器类型
+ */
+export type EventListener<T extends NodeSystemEvent = NodeSystemEvent> = (event: T) => void;
+
+/**
+ * 事件类型映射
+ */
+export interface EventTypes {
+  connectionDragStart: ConnectionDragStartEvent;
+  connectionDragMove: ConnectionDragMoveEvent;
+  connectionDragEnd: ConnectionDragEndEvent;
+  connectionCreated: ConnectionCreatedEvent;
+  connectionCreateFailed: ConnectionCreateFailedEvent;
+}

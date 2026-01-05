@@ -1,4 +1,13 @@
-import type { RenderConfig, Position, RenderContext, NodeRenderer, EdgeRouter, EdgeRenderer, EdgeRoutePoint } from "./types.js";
+import type {
+  RenderConfig,
+  Position,
+  RenderContext,
+  NodeRenderer,
+  EdgeRouter,
+  EdgeRenderer,
+  EdgeRoutePoint,
+  PortRef,
+} from "./types.js";
 import type { NodeSystem } from "./NodeSystem.js";
 import type { Node } from "./Node.js";
 import { DefaultNodeRenderer } from "./renderers/DefaultNodeRenderer.js";
@@ -32,6 +41,7 @@ export class Renderer {
   private nodeRenderer: NodeRenderer;
   private edgeRouter: EdgeRouter;
   private edgeRenderer: EdgeRenderer;
+  private draggingConnection: { fromPort: PortRef; currentPosition: Position; isActive: boolean };
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -54,6 +64,13 @@ export class Renderer {
     this.nodeRenderer = nodeRenderer || new DefaultNodeRenderer();
     this.edgeRouter = edgeRouter || new DefaultEdgeRouter();
     this.edgeRenderer = edgeRenderer || new DefaultEdgeRenderer();
+
+    // 初始化拖拽连线状态
+    this.draggingConnection = {
+      fromPort: { nodeId: "", portId: "", portType: "output" },
+      currentPosition: { x: 0, y: 0 },
+      isActive: false,
+    };
   }
 
   /**
@@ -139,9 +156,64 @@ export class Renderer {
       }
     }
 
+    // 绘制拖拽中的临时连线
+    if (this.draggingConnection.isActive) {
+      this.drawDraggingConnection(renderContext);
+    }
+
     // 再绘制节点
     for (const node of nodes) {
       this.nodeRenderer.render(node, renderContext);
+    }
+  }
+
+  /**
+   * 绘制拖拽中的临时连线
+   */
+  private drawDraggingConnection(renderContext: RenderContext): void {
+    if (!this.draggingConnection.isActive) return;
+
+    const { fromPort, currentPosition } = this.draggingConnection;
+    const fromNode = this.nodeSystem.getNode(fromPort.nodeId);
+
+    // 计算起始端口位置
+    const portPosition =
+      fromPort.portType === "output"
+        ? fromNode.getOutputPortPosition(fromPort.portId)
+        : fromNode.getInputPortPosition(fromPort.portId);
+
+    const screenFrom = renderContext.worldToScreen(portPosition);
+    const screenTo = renderContext.worldToScreen(currentPosition);
+
+    // 绘制虚线
+    this.ctx.save();
+    this.ctx.setLineDash([5, 5]);
+    this.ctx.strokeStyle = this.config.selectionColor;
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenFrom.x, screenFrom.y);
+    this.ctx.lineTo(screenTo.x, screenTo.y);
+    this.ctx.stroke();
+    this.ctx.restore();
+  }
+
+  /**
+   * 设置拖拽连线状态
+   */
+  setDraggingConnection(fromPort: PortRef, currentPosition: Position, isActive: boolean): void {
+    this.draggingConnection = {
+      fromPort,
+      currentPosition,
+      isActive,
+    };
+  }
+
+  /**
+   * 更新拖拽连线位置
+   */
+  updateDraggingConnectionPosition(position: Position): void {
+    if (this.draggingConnection.isActive) {
+      this.draggingConnection.currentPosition = position;
     }
   }
 
